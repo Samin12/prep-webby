@@ -1,0 +1,60 @@
+{
+  "audio": "REPLACED_BY_SKILL_EACH_DAY.mp3",
+  "screens": {
+    "ROG": {
+      "x": 0,
+      "y": 0,
+      "w": 2560,
+      "h": 1440
+    },
+    "MacBook": {
+      "x": 2560,
+      "y": 24,
+      "w": 1312,
+      "h": 824
+    },
+    "ROG-left": {
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 1440
+    },
+    "ROG-right": {
+      "x": 1280,
+      "y": 0,
+      "w": 1280,
+      "h": 1440
+    }
+  },
+  "cues": [
+    {
+      "time": 1.0,
+      "label": "Calendar",
+      "type": "chrome_url",
+      "url": "https://calendar.google.com/calendar/u/1/r/day/2026/8/27",
+      "new_window": true,
+      "screen": "ROG-left"
+    },
+    {
+      "time": 4.5,
+      "label": "Skool community",
+      "type": "chrome_url",
+      "url": "https://www.skool.com/claude",
+      "new_window": true,
+      "screen": "ROG-right",
+      "scroll": {
+        "times": 5,
+        "interval": 0.12,
+        "amount": "page_down"
+      }
+    },
+    {
+      "time": 24.0,
+      "label": "Showcase (extra page)",
+      "type": "chrome_url",
+      "url": "http://127.0.0.1:8794/stage.html",
+      "new_window": true,
+      "screen": "ROG"
+    }
+  ]
+}
