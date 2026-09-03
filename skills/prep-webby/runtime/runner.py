@@ -9,24 +9,40 @@ PROJECT_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = PROJECT_DIR / "config.json"
 
 
+def apple_string(value):
+    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
 def load_config():
     with open(CONFIG_PATH) as f:
         return json.load(f)
 
 
 def run_applescript(script):
-    subprocess.run(["osascript", "-e", script], check=False)
+    subprocess.run(
+        ["osascript", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def chrome_open_url(url, new_window, bounds):
+    safe_url = apple_string(url)
+    bounds_command = ""
+    if bounds:
+        bounds_command = (
+            f'set bounds of front window to {{{bounds["x"]}, {bounds["y"]}, '
+            f'{bounds["x"] + bounds["w"]}, {bounds["y"] + bounds["h"]}}}'
+        )
     if new_window:
         script = f'''
         tell application "Google Chrome"
             activate
             make new window
-            set URL of active tab of front window to "{url}"
+            set URL of active tab of front window to "{safe_url}"
             delay 0.6
-            set bounds of front window to {{{bounds["x"]}, {bounds["y"]}, {bounds["x"] + bounds["w"]}, {bounds["y"] + bounds["h"]}}}
+            {bounds_command}
         end tell
         '''
     else:
@@ -37,10 +53,10 @@ def chrome_open_url(url, new_window, bounds):
                 make new window
             end if
             tell front window
-                set newTab to make new tab with properties {{URL:"{url}"}}
+                set newTab to make new tab with properties {{URL:"{safe_url}"}}
             end tell
             delay 0.6
-            set bounds of front window to {{{bounds["x"]}, {bounds["y"]}, {bounds["x"] + bounds["w"]}, {bounds["y"] + bounds["h"]}}}
+            {bounds_command}
         end tell
         '''
     run_applescript(script)
@@ -55,7 +71,8 @@ def scroll_fast(times=5, interval=0.12, amount="page_down"):
 
 
 def open_app(app_name, bounds=None):
-    run_applescript(f'tell application "{app_name}" to activate')
+    safe_app_name = apple_string(app_name)
+    run_applescript(f'tell application "{safe_app_name}" to activate')
     if bounds:
         time.sleep(0.6)
         run_applescript(
@@ -65,7 +82,8 @@ def open_app(app_name, bounds=None):
 
 
 def reveal_in_finder(path):
-    run_applescript(f'tell application "Finder" to reveal POSIX file "{path}"')
+    safe_path = apple_string(path)
+    run_applescript(f'tell application "Finder" to reveal POSIX file "{safe_path}"')
     run_applescript('tell application "Finder" to activate')
 
 

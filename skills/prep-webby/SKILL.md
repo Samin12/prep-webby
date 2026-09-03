@@ -1,65 +1,182 @@
 ---
 name: prep-webby
-description: Prep the day for a webinar ("webby") with the full Jarvis rig. Use when the user says "prep webby", "prep webby for the day", "webby prep", or wants the Jarvis morning-briefing demo set up for a webinar day. Organizes and color-codes today's Google Calendar, generates the ElevenLabs Jarvis briefing audio, installs it into the cue server with screen choreography, and spins up Agent Club + Friday.
+description: Prepare Samin's target webinar day with his saved Chrome tab-group workspace, a conflict-safe Google Calendar plan, a personalized ElevenLabs Jarvis briefing, and verified Calendar/Skool/Friday screen cues. Use for "prep webby", "webinar prep", "set up my webinar day", or requests to restore Samin's webinar workspace and Jarvis demo.
 ---
 
-# Prep Webby — Jarvis webinar-day rig
+# Prep Webby
 
-You are prepping Samin's day for a webinar and arming the Jarvis voice demo.
-Follow the phases in order. Everything is idempotent — safe to re-run.
+Prepare the target webinar day end to end. The result is not complete until the
+calendar, Chrome groups, briefing audio, cue configuration, and local services
+have each been read back or health-checked.
 
-## Phase 0 — Onboarding check (first run on a new machine)
+Default timezone: `America/New_York`.
 
-Run `scripts/setup.sh` from this skill's directory. It:
-- clones **Agent Club** (`https://github.com/AI-Answer/Agent-Club.git`) into `~/Downloads/Agent-Club` and runs `npm install` if missing
-- clones **Friday** (`https://github.com/Samin12/friday.git`) into `~/friday` if missing
-- installs the Jarvis runtime (`server.py`, `runner.py`, `config.template.json`) into `~/Downloads/jarvis-reel-director/` and the launcher scripts (`ask.sh`, `jarvis-day.sh`) + `greeting.mp3` into `~/jarvis/`
-- adds the `jarvis` alias to `~/.zshrc`
-- checks deps: `ffmpeg`, `whisper-cli`, `python3`, `node`
+## Resolve the target webinar
 
-If setup.sh reports a missing dependency, tell the user the brew command to fix it.
+1. Prefer a date and time explicitly supplied by the user.
+2. Otherwise search the primary Google Calendar for the next 90 days using
+   `webinar`, `webby`, and the named event or community.
+3. If overlapping candidates occur on one date, prefer the specific,
+   non-placeholder event with the longer duration. Report the other candidate;
+   never delete it without a direct request.
+4. If no match exists, ask for the date. Do not silently turn "prep webby" into
+   a plan for today.
 
-## Phase 1 — Calendar for today
+Read the complete target day before changing it. Never move, rename, delete, or
+change attendees on an event organized by someone else. A declined or
+needs-action invitation is still protected; do not change its response status.
 
-Use the Google Calendar MCP (list_events for today, then create/update).
+## Phase 0: Check the machine
 
-1. List today's events. Identify the webinar — an event named like "webby"/"webinar". If the user gave a time (default 1:00–3:00 PM America/New_York), make sure it exists at that time; rename it to `🟢 Webinar — MAIN PRIORITY`, colorId 10.
-2. Fill the day around existing meetings, color-coded:
-   - `🟢 Skool Community — Morning Replies` 8:00–9:00, colorId 10
-   - `🔵 Film — <current course/video>` mid-morning block, colorId 9 (ask nothing; pick the project the user mentioned, or a generic deep-work film block)
-   - `🟠 Webinar Follow-ups + Emails` 15 min after the webinar ends, 1h, colorId 6
-   - Personal blocks (packing, errands) colorId 5 with 🟡
-3. Never move or delete meetings with attendees. Fit blocks around them.
-4. Color convention: blue 9 = deep work, green 10 = community/webinar, orange 6 = admin/email, yellow 5 = personal.
+Run `scripts/setup.sh` from this skill directory on first use and after pulling
+an update. It installs the checked-in Jarvis runtime while preserving the live
+`config.json`, and checks `ffmpeg`, `whisper-cli`, `python3`, and `node`.
 
-## Phase 2 — ElevenLabs Jarvis briefing
+If a dependency is missing, report the exact missing command and suggested
+installation command. Do not claim the rig is ready.
 
-- Voice ID: `sI8FqE1zOcqXDhRwCwAx` ("Jarvis AI Assistant"), model `eleven_multilingual_v2`, voice_settings `{"stability":0.5,"similarity_boost":0.75,"style":0.3}`.
-- API key: `$ELEVENLABS_API_KEY`, else read the `api_key` from `~/Library/Application Support/Claude/Claude Extensions Settings/ant.dir.gh.elevenlabs.elevenlabs-player.json`. Never commit or print the key.
-- Script template (~25–35s). Weave in the REAL events from Phase 1:
+## Phase 1: Build the target day's calendar
 
-> "Good morning, sir. Here is your <weekday>. First up: your Skool community — I am opening it now for your morning replies. At <time>, <deep work block>. <Meetings>. Then your main event: the webinar, from <start> to <end>. Good luck up there, sir. <Follow-ups / personal blocks>. Dinner at <time>. And… I see you are in the middle of the webinar, sir. Hello, everyone. I think you might want to see this. Check out Friday — the assistant."
+Use Google Calendar's event palette. Confirm the current palette before writes;
+the expected event colors are blue `9`, green `10`, orange `6`, and yellow `5`.
 
-Keep the Friday reveal ending only on webinar-demo days (default: keep it).
-- Generate with curl `POST https://api.elevenlabs.io/v1/text-to-speech/<voice>?output_format=mp3_44100_128`, save to `~/Downloads/jarvis_<day>_briefing.mp3`, check duration with `afinfo`.
+Start from the actual event times and existing busy windows. Upsert solo blocks,
+never blindly create duplicates. Managed blocks must contain this description
+marker:
 
-## Phase 3 — Install into the cue server
+```text
+prep-webby-managed:v2
+```
 
-Edit `~/Downloads/jarvis-reel-director/config.json`:
-- `audio`: today's mp3
-- Screens must include `ROG` plus virtual halves `ROG-left`/`ROG-right` (half width each). Detect the ROG monitor origin if needed.
-- Cues (times estimated from the script wording, ~2.6 words/sec):
-  1. ~1.0s → today's Google Calendar day view (`https://calendar.google.com/calendar/u/1/r/day/YYYY/M/D`), screen `ROG-left`, new_window true
-  2. when "opening it now" is said (~4.5s) → `https://www.skool.com/claude`, screen `ROG-right`, new_window true
-  3. when "you might want to see this" is said (near the end) → `http://127.0.0.1:8794/stage.html` (Friday), screen `ROG` full, new_window true
+On the first v2 run, also treat an existing same-day event with the same title
+and time as an upsert candidate. Add the marker to a user-owned solo event
+instead of creating a duplicate.
 
-## Phase 4 — Spin everything up
+Default blocks, fitted around existing meetings:
 
-- Cue server: `cd ~/Downloads/jarvis-reel-director && nohup python3 server.py &` if `curl -m1 http://127.0.0.1:8765/status` fails.
-- Friday: `cd ~/friday && nohup python3 server.py &` if `curl -m1 http://127.0.0.1:8794/stage.html` fails.
-- Agent Club: `cd ~/Downloads/Agent-Club && npm start &` if no `electron-vite dev` process. Confirm "Showing main window" in its log.
-- Sync Agent Club's demo UI to today's briefing: update `TOP_THREE`/`AGENDA` in `src/renderer/pages/jarvis/components/DailyBrief.tsx` and `DEMO_BRIEFING_TEXT` in `src/renderer/pages/jarvis/services/demoDirector.ts` (dev mode hot-reloads).
+- `🟢 Skool Community — Morning Replies`, 8:00–9:00 AM, green.
+- `🔵 Webinar Rehearsal + Tech Check`, 60 minutes, ending at least 60 minutes
+  before the webinar, blue.
+- Canonical webinar interval, green. When allowed, change only the event color
+  on the user's calendar copy. Never create a second busy hold on top of an
+  existing webinar. If the event cannot be colored safely, preserve it and
+  report that limitation.
+- `🟠 Webinar Follow-ups + Emails`, starting 15 minutes after the webinar and
+  lasting 60 minutes, orange.
 
-## Phase 5 — Hand off
+Only add film, packing, errands, meals, or other personal blocks when the user
+mentioned them or they already exist. Do not invent a full life schedule.
 
-Tell the user: run `jarvis` (or `~/jarvis/ask.sh`), type the line ("hey jarvis hows my day looking"), **hit Enter**, and Jarvis speaks with the orb glowing while Calendar/Skool/Friday fire on the ROG monitor at their cue times. Warn if Friday's server was down when checked.
+After writes, search the date again and read back every managed block's title,
+start, end, color, and event URL. Report conflicts rather than stacking blocks
+on top of meetings.
+
+## Phase 2: Restore the Chrome workspace
+
+Read [references/browser-workspace.md](references/browser-workspace.md). It is
+the human-readable source of truth for group order, colors, collapsed state,
+and URLs; `runtime/browser-workspace.json` contains the same snapshot for
+machine checks.
+
+Operate the user's existing Chrome profile, not a fresh automation browser.
+Prefer the saved tab-group buttons because Chrome preserves the group's name,
+color, order, and tabs:
+
+1. Inspect the live Chrome tab inventory and saved tab-group toolbar.
+2. For each required group, do nothing when it is already open. If its saved
+   button says `Closed`, open it once. Never duplicate an open group.
+3. If a saved group is missing, rebuild only that group from the reference.
+   Keep unrelated tabs and groups untouched.
+4. Restore the captured left-to-right group order and collapsed state.
+5. Re-read the live tab inventory. Verify every required group name and URL.
+
+The duplicate `scroll-world` URL in both `Skills` and `Website` is intentional.
+Do not add ungrouped research, inbox, or email-thread tabs to this workspace.
+
+## Phase 3: Personalize the briefing
+
+Read [references/samin-profile.md](references/samin-profile.md). Use only the
+public professional facts relevant to the audience. Prefer the live calendar,
+the user's stated topic, and the current project over generic biography.
+
+Never put private email content, street addresses, phone numbers, browser
+history, or calendar attendee details into the script or the public repository.
+
+Write a 25–40 second briefing using the real target-day events. Keep this shape:
+
+> "Good morning, sir. Here is your <weekday>. First up: your Skool community —
+> I am opening it now for your morning replies. At <time>, <rehearsal or deep
+> work>. <Protected meetings>. Then your main event: <webinar title>, from
+> <start> to <end>. Good luck up there, sir. <Follow-ups>. And… I see you are in
+> the middle of the webinar, sir. Hello, everyone. I think you might want to see
+> this. Check out Friday — the assistant."
+
+Keep the Friday reveal only for a webinar demo. Do not claim capabilities that
+the rig will not visibly demonstrate.
+
+## Phase 4: Generate and align Jarvis audio
+
+Use ElevenLabs voice `sI8FqE1zOcqXDhRwCwAx` ("Jarvis AI Assistant"), model
+`eleven_multilingual_v2`, and settings
+`{"stability":0.5,"similarity_boost":0.75,"style":0.3}`.
+
+Read the API key from `ELEVENLABS_API_KEY`; otherwise read `api_key` from:
+
+```text
+~/Library/Application Support/Claude/Claude Extensions Settings/ant.dir.gh.elevenlabs.elevenlabs-player.json
+```
+
+Never print, log, or commit the key. Save the MP3 as
+`~/Downloads/jarvis_<YYYY-MM-DD>_briefing.mp3` and verify it with `afinfo` or
+`ffprobe`.
+
+Determine cue times from the generated audio. Prefer timestamped transcription
+from `whisper-cli`; fall back to proportional word-position estimates. Confirm
+that cue times are ordered and less than the audio duration.
+
+## Phase 5: Install the screen cues
+
+Update `~/Downloads/jarvis-reel-director/config.json` without overwriting its
+screen calibration:
+
+1. Around 1 second: target-date Google Calendar day view on `ROG-left`.
+2. At "opening it now": `https://www.skool.com/claude` on `ROG-right`.
+3. At "you might want to see this": `http://127.0.0.1:8794/stage.html` on the
+   full `ROG` screen.
+
+Use `runtime/jarvis-day.sh` with the verified audio path, target-date Calendar
+URL, and cue seconds. Read back the resulting JSON and confirm the audio path,
+three URLs, screen assignments, and ordered cue times.
+
+## Phase 6: Arm the rig
+
+- Cue server: start `server.py` if `http://127.0.0.1:8765/status` is
+  unavailable. If the endpoint lacks `last_run`, restart that listener once so
+  the updated status contract is active.
+- Friday: start its server only if `http://127.0.0.1:8794/stage.html` is
+  unavailable.
+- Agent Club: start it only if no `electron-vite dev` process is running.
+- Update Agent Club's
+  `src/renderer/pages/jarvis/components/DailyBrief.tsx` and
+  `src/renderer/pages/jarvis/services/demoDirector.ts` from the same frozen
+  briefing text so the orb UI and audio agree.
+
+Health-check both HTTP endpoints and confirm Agent Club reached `Showing main
+window`. Do not trigger the performance early when preparing a future date.
+
+## Handoff
+
+On the webinar day, tell the user to run `jarvis` (or `~/jarvis/ask.sh`), type
+`hey jarvis hows my day looking`, and press Enter.
+
+Report separately:
+
+- target webinar and any overlapping candidate;
+- calendar blocks created, updated, unchanged, or conflicted;
+- Chrome groups opened, already open, rebuilt, or missing;
+- audio path and duration;
+- cue readback;
+- service health.
+
+Prepared is not performed. Only say the Jarvis demo ran after `/status` reports
+`last_run.status` as `complete`; report `failed` or `cancelled` exactly.

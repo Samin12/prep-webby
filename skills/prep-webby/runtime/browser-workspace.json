@@ -1,0 +1,58 @@
+{
+  "captured_at": "2026-09-03",
+  "chrome_profile": "Samin",
+  "groups": [
+    {
+      "name": "Skills",
+      "color": "red",
+      "collapsed": true,
+      "urls": [
+        "https://github.com/Samin12/youtube-video-packaging-plugin",
+        "https://github.com/Samin12/first-last-frame-video-skill",
+        "https://github.com/Samin12/instagram-thread-carousel",
+        "https://github.com/Samin12/b-roll-finder",
+        "https://github.com/Samin12/friday",
+        "https://github.com/oso95/scroll-world"
+      ]
+    },
+    {
+      "name": "Insta",
+      "color": "grey",
+      "collapsed": true,
+      "urls": [
+        "https://www.instagram.com/samin_yasar12/",
+        "https://www.instagram.com/samin_yasar12/p/DabDT23oBCh/?img_index=4",
+        "https://www.instagram.com/samin_yasar12/p/DXCS7CikaF2/?img_index=4",
+        "https://www.instagram.com/samin_yasar12/p/DXC4q1UlJda/"
+      ]
+    },
+    {
+      "name": "Website",
+      "color": "blue",
+      "collapsed": false,
+      "urls": [
+        "https://claudeclublive.higgsfield.app/",
+        "https://www.skool.com/claude/-/search?q=https%3A%2F%2Fclaudeclublive.higgsfield.app%2F",
+        "https://github.com/oso95/scroll-world"
+      ]
+    },
+    {
+      "name": "Content Pipeline",
+      "color": "yellow",
+      "collapsed": false,
+      "urls": [
+        "https://my.blotato.com/queue/calendar",
+        "https://clip.opus.pro/clip/P3090213HElo",
+        "https://www.instagram.com/p/Db-2eDXoP4r/"
+      ]
+    },
+    {
+      "name": "Trading",
+      "color": "green",
+      "collapsed": false,
+      "urls": [
+        "https://jade-diner-czkc.here.now/"
+      ]
+    }
+  ]
+}
