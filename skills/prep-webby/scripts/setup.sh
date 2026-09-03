@@ -1,6 +1,6 @@
 #!/bin/bash
 # prep-webby onboarding — idempotent. Installs Agent Club, Friday, and the Jarvis runtime.
-set -uo pipefail
+set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; }
 warn() { printf "  \033[33m!\033[0m %s\n" "$1"; }
@@ -23,13 +23,12 @@ else ok "Friday present"; fi
 # 3. Jarvis runtime (cue server + launcher scripts)
 mkdir -p "$HOME/Downloads/jarvis-reel-director" "$HOME/jarvis"
 for f in server.py runner.py; do
-  [ -f "$HOME/Downloads/jarvis-reel-director/$f" ] || cp "$HERE/runtime/$f" "$HOME/Downloads/jarvis-reel-director/$f"
+  install -m 0644 "$HERE/runtime/$f" "$HOME/Downloads/jarvis-reel-director/$f"
 done
 [ -f "$HOME/Downloads/jarvis-reel-director/config.json" ] || cp "$HERE/runtime/config.template.json" "$HOME/Downloads/jarvis-reel-director/config.json"
-cp -n "$HERE/runtime/ask.sh" "$HERE/runtime/jarvis-day.sh" "$HOME/jarvis/" 2>/dev/null
-cp -n "$HERE/assets/greeting.mp3" "$HOME/jarvis/" 2>/dev/null
-chmod +x "$HOME/jarvis/ask.sh" "$HOME/jarvis/jarvis-day.sh" 2>/dev/null
-ok "Jarvis runtime installed (~/jarvis + ~/Downloads/jarvis-reel-director)"
+install -m 0755 "$HERE/runtime/ask.sh" "$HERE/runtime/jarvis-day.sh" "$HOME/jarvis/"
+install -m 0644 "$HERE/assets/greeting.mp3" "$HOME/jarvis/greeting.mp3"
+ok "Jarvis runtime updated; live config.json preserved"
 
 # 4. jarvis alias
 grep -q 'alias jarvis=' "$HOME/.zshrc" 2>/dev/null || { echo 'alias jarvis="$HOME/jarvis/ask.sh"' >> "$HOME/.zshrc"; ok "jarvis alias added to ~/.zshrc"; }

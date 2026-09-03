@@ -1,35 +1,125 @@
 #!/bin/zsh
-# Shared Jarvis day runner.
-# Usage: jarvis-day.sh <audio.mp3> <cal-url> <skool-cue-seconds> [extra-url] [extra-cue-seconds]
-# The optional extra cue opens a third page on the ROG left half late in the
-# briefing (e.g. "let me show you Friday" -> Friday's calendar view).
-AUDIO="$1"; CAL="$2"; SKOOL_T="${3:-13}"; EXTRA_URL="${4:-}"; EXTRA_T="${5:-0}"
+# Install one verified briefing and cue timeline.
+# Usage: jarvis-day.sh <audio.mp3> <calendar-url> <skool-seconds> <friday-url> <friday-seconds>
+set -euo pipefail
 
-# Install this day's briefing + cues into the reel-director config
-python3 - "$AUDIO" "$CAL" "$SKOOL_T" "$EXTRA_URL" "$EXTRA_T" <<'EOF'
-import json, sys
-p = '/Users/saminyasar/Downloads/jarvis-reel-director/config.json'
-c = json.load(open(p))
-c['audio'] = sys.argv[1]
-c['cues'] = c['cues'][:2]
-c['cues'][0].update(time=1.0, label='Calendar', url=sys.argv[2], screen='ROG-left', new_window=True)
-c['cues'][1].update(time=float(sys.argv[3]), label='Skool community', screen='ROG-right')
-if sys.argv[4]:
-    c['cues'].append({'time': float(sys.argv[5]), 'label': 'Showcase (extra page)',
-                      'type': 'chrome_url', 'url': sys.argv[4], 'new_window': True, 'screen': 'ROG'})
-json.dump(c, open(p, 'w'), indent=2)
-EOF
-
-# Make sure the cue server is up, clear any stuck run
-if ! curl -s -m 1 http://127.0.0.1:8765/status >/dev/null 2>&1; then
-  (cd ~/Downloads/jarvis-reel-director && nohup python3 server.py >/dev/null 2>&1 &)
-  sleep 1
+if (( $# < 5 )); then
+  print -u2 "usage: $0 <audio.mp3> <calendar-url> <skool-seconds> <friday-url> <friday-seconds>"
+  exit 2
 fi
-curl -s -X POST http://127.0.0.1:8765/stop >/dev/null 2>&1
 
-echo "Type your line and HIT ENTER to start:"
-printf "You: "
-read -r line
+AUDIO="$1"
+CAL="$2"
+SKOOL_T="$3"
+FRIDAY_URL="$4"
+FRIDAY_T="$5"
+CONFIG_PATH="${JARVIS_CONFIG:-$HOME/Downloads/jarvis-reel-director/config.json}"
 
-curl -s -X POST http://127.0.0.1:8765/start >/dev/null
-echo "Jarvis: ..."
+if [[ ! -f "$AUDIO" ]]; then
+  print -u2 "audio file not found: $AUDIO"
+  exit 1
+fi
+
+python3 - "$CONFIG_PATH" "$AUDIO" "$CAL" "$SKOOL_T" "$FRIDAY_URL" "$FRIDAY_T" <<'PY'
+import json
+import math
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+config_path = Path(sys.argv[1]).expanduser()
+audio_path = str(Path(sys.argv[2]).expanduser().resolve())
+calendar_url = sys.argv[3]
+skool_time = float(sys.argv[4])
+friday_url = sys.argv[5]
+friday_time = float(sys.argv[6])
+
+if not config_path.is_file():
+    raise SystemExit(f"config file not found: {config_path}")
+if not all(math.isfinite(value) for value in (skool_time, friday_time)):
+    raise SystemExit("cue times must be finite numbers")
+if not (1.0 < skool_time < friday_time):
+    raise SystemExit("cue times must be ordered: Calendar < Skool < Friday")
+
+parsed_calendar = urlparse(calendar_url)
+if (
+    parsed_calendar.scheme != "https"
+    or parsed_calendar.hostname != "calendar.google.com"
+    or parsed_calendar.username
+    or parsed_calendar.password
+    or parsed_calendar.port not in (None, 443)
+    or not parsed_calendar.path.startswith("/calendar/")
+):
+    raise SystemExit("calendar URL must use https://calendar.google.com")
+if friday_url != "http://127.0.0.1:8794/stage.html":
+    raise SystemExit("Friday URL must be http://127.0.0.1:8794/stage.html")
+
+with config_path.open() as handle:
+    config = json.load(handle)
+
+required_screens = {"ROG", "ROG-left", "ROG-right"}
+missing = required_screens.difference(config.get("screens", {}))
+if missing:
+    raise SystemExit(f"missing calibrated screens: {', '.join(sorted(missing))}")
+
+config["audio"] = audio_path
+config["cues"] = [
+    {
+        "time": 1.0,
+        "label": "Calendar",
+        "type": "chrome_url",
+        "url": calendar_url,
+        "new_window": True,
+        "screen": "ROG-left",
+    },
+    {
+        "time": skool_time,
+        "label": "Skool community",
+        "type": "chrome_url",
+        "url": "https://www.skool.com/claude",
+        "new_window": True,
+        "screen": "ROG-right",
+        "scroll": {"times": 5, "interval": 0.12, "amount": "page_down"},
+    },
+    {
+        "time": friday_time,
+        "label": "Friday reveal",
+        "type": "chrome_url",
+        "url": friday_url,
+        "new_window": True,
+        "screen": "ROG",
+    },
+]
+
+temporary = config_path.with_suffix(".json.tmp")
+with temporary.open("w") as handle:
+    json.dump(config, handle, indent=2)
+    handle.write("\n")
+temporary.replace(config_path)
+print(json.dumps({"config": str(config_path), "audio": audio_path, "cues": config["cues"]}, indent=2))
+PY
+
+if [[ "${JARVIS_CONFIG_ONLY:-0}" == "1" ]]; then
+  print "Jarvis config updated without starting services."
+  exit 0
+fi
+
+ensure_cue_server() {
+  if curl -fsS -m 1 http://127.0.0.1:8765/status >/dev/null 2>&1; then
+    return 0
+  fi
+
+  (cd "$HOME/Downloads/jarvis-reel-director" && nohup python3 server.py >/dev/null 2>&1 &)
+  for _ in {1..20}; do
+    curl -fsS -m 1 http://127.0.0.1:8765/status >/dev/null 2>&1 && return 0
+    sleep 0.25
+  done
+
+  print -u2 "cue server did not become ready at http://127.0.0.1:8765/status"
+  return 1
+}
+
+ensure_cue_server
+
+curl -fsS -X POST http://127.0.0.1:8765/stop >/dev/null
+print "Jarvis day armed. Run 'jarvis' when it is time to perform."

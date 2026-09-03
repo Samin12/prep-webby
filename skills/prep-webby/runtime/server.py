@@ -13,6 +13,7 @@ PORT = 8765
 runner_process = None
 # Performance phase shown by the app orb: idle | listening | speaking
 phase = "idle"
+last_run = {"status": "never", "returncode": None}
 phase_lock = threading.Lock()
 cancel_event = threading.Event()
 
@@ -30,10 +31,14 @@ def set_phase(value):
 
 def run_performance(listen_seconds, mute):
     """listening glow -> (user says their line) -> runner speaks -> idle."""
-    global runner_process
+    global last_run, runner_process
     cancel_event.clear()
+    with phase_lock:
+        last_run = {"status": "running", "returncode": None}
     set_phase("listening")
     if cancel_event.wait(listen_seconds):
+        with phase_lock:
+            last_run = {"status": "cancelled", "returncode": None}
         set_phase("idle")
         return
     cmd = [sys.executable, str(PROJECT_DIR / "runner.py")]
@@ -42,6 +47,15 @@ def run_performance(listen_seconds, mute):
     runner_process = subprocess.Popen(cmd)
     set_phase("speaking")
     runner_process.wait()
+    if cancel_event.is_set():
+        status = "cancelled"
+    else:
+        status = "complete" if runner_process.returncode == 0 else "failed"
+    with phase_lock:
+        last_run = {
+            "status": status,
+            "returncode": runner_process.returncode,
+        }
     set_phase("idle")
 
 
@@ -77,7 +91,8 @@ class Handler(BaseHTTPRequestHandler):
             running = runner_process is not None and runner_process.poll() is None
             with phase_lock:
                 p = phase
-            body = json.dumps({"running": running, "phase": p}).encode()
+                result = dict(last_run)
+            body = json.dumps({"running": running, "phase": p, "last_run": result}).encode()
             self._send(200, "application/json", body)
         elif self.path == "/test-keys":
             # Sends a harmless Shift key event to check Accessibility permission
@@ -100,7 +115,7 @@ class Handler(BaseHTTPRequestHandler):
         return running or p != "idle"
 
     def do_POST(self):
-        global runner_process
+        global last_run, runner_process
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         if parsed.path == "/perform":
@@ -128,10 +143,14 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=run_performance, args=(0, mute), daemon=True).start()
             self._send(200, "application/json", json.dumps({"started": True, "mute": mute}).encode())
         elif parsed.path == "/stop":
+            was_busy = self._busy()
             cancel_event.set()
             if runner_process is not None and runner_process.poll() is None:
                 runner_process.terminate()
             subprocess.run(["pkill", "-f", "afplay"], capture_output=True)
+            if was_busy:
+                with phase_lock:
+                    last_run = {"status": "cancelled", "returncode": None}
             set_phase("idle")
             self._send(200, "application/json", b'{"stopped": true}')
         else:
