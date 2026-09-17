@@ -26,7 +26,7 @@ for f in server.py runner.py; do
   install -m 0644 "$HERE/runtime/$f" "$HOME/Downloads/jarvis-reel-director/$f"
 done
 [ -f "$HOME/Downloads/jarvis-reel-director/config.json" ] || cp "$HERE/runtime/config.template.json" "$HOME/Downloads/jarvis-reel-director/config.json"
-install -m 0755 "$HERE/runtime/ask.sh" "$HERE/runtime/jarvis-day.sh" "$HOME/jarvis/"
+install -m 0755 "$HERE/runtime/ask.sh" "$HERE/runtime/jarvis-day.sh" "$HERE/runtime/webby.sh" "$HOME/jarvis/"
 install -m 0644 "$HERE/assets/greeting.mp3" "$HOME/jarvis/greeting.mp3"
 ok "Jarvis runtime updated; live config.json preserved"
 
