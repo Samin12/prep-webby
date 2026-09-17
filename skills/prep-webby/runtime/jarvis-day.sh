@@ -38,8 +38,8 @@ if not config_path.is_file():
     raise SystemExit(f"config file not found: {config_path}")
 if not all(math.isfinite(value) for value in (skool_time, friday_time)):
     raise SystemExit("cue times must be finite numbers")
-if not (1.0 < skool_time < friday_time):
-    raise SystemExit("cue times must be ordered: Calendar < Skool < Friday")
+if not (3.5 < skool_time < friday_time):
+    raise SystemExit("cue times must be ordered: Skool (3.5) < Calendar < Friday")
 
 parsed_calendar = urlparse(calendar_url)
 if (
@@ -65,7 +65,7 @@ if missing:
 config["audio"] = audio_path
 config["cues"] = [
     {
-        "time": 1.0,
+        "time": skool_time,
         "label": "Calendar",
         "type": "chrome_url",
         "url": calendar_url,
@@ -73,7 +73,7 @@ config["cues"] = [
         "screen": "ROG-left",
     },
     {
-        "time": skool_time,
+        "time": 3.5,
         "label": "Skool community",
         "type": "chrome_url",
         "url": "https://www.skool.com/claude",
