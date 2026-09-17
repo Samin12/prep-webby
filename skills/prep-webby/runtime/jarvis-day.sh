@@ -79,7 +79,6 @@ config["cues"] = [
         "url": "https://www.skool.com/claude",
         "new_window": True,
         "screen": "ROG-right",
-        "scroll": {"times": 5, "interval": 0.12, "amount": "page_down"},
     },
     {
         "time": friday_time,

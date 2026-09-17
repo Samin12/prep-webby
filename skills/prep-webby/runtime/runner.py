@@ -19,12 +19,10 @@ def load_config():
 
 
 def run_applescript(script):
-    subprocess.run(
-        ["osascript", "-e", script],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"  applescript warning: {r.stderr.strip()}", file=sys.stderr, flush=True)
+    return r.returncode == 0
 
 
 def chrome_open_url(url, new_window, bounds):
@@ -43,6 +41,8 @@ def chrome_open_url(url, new_window, bounds):
             set URL of active tab of front window to "{safe_url}"
             delay 0.6
             {bounds_command}
+            set index of front window to 1
+            activate
         end tell
         '''
     else:
@@ -129,7 +129,10 @@ def main():
         now = time.monotonic()
         if target > now:
             time.sleep(target - now)
-        execute_cue(cue, screens)
+        try:
+            execute_cue(cue, screens)
+        except Exception as exc:  # keep the show going
+            print(f"  cue failed: {exc}", file=sys.stderr, flush=True)
 
     if player is not None:
         player.wait()
